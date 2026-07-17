@@ -68,8 +68,9 @@ print('s4')
 display.set_power(True)
 display.init()
 display.set_color_inversion(True)
-# display.set_rotation(lv.DISPLAY_ROTATION._90)
+display.set_rotation(lv.DISPLAY_ROTATION._0)
 display.set_backlight(100)
+
 
 # ============ 使用 TouchCalData 处理触摸校准 ============
 from touch_cal_data import TouchCalData
@@ -81,12 +82,12 @@ i2c_bus = I2C.Bus(host=0, sda=18, scl=19)
 touch_i2c = I2C.Device(i2c_bus, axs5106.I2C_ADDR, axs5106.BITS)
 
 # 创建触摸设备，传入校准数据
-indev = axs5106.AXS5106(touch_i2c, reset_pin=20, touch_cal=touch_cal)
+indev = axs5106.AXS5106(touch_i2c, startup_rotation=lv.DISPLAY_ROTATION._0, reset_pin=20, touch_cal=touch_cal)
 
 # 如果未校准，设置镜像参数
 if not indev.is_calibrated:
     print("设置触摸校准参数...")
-    touch_cal.mirrorX = True   # X轴镜像
+    touch_cal.mirrorX = False   # X轴镜像
     touch_cal.mirrorY = False  # Y轴不镜像
 
     touch_cal.alphaX = 1.0
@@ -381,6 +382,7 @@ class TouchPainter:
         state = indev.get_state()
 
         if state == indev.PRESSED:
+            print("raw:", indev._last_x, indev._last_y)
             x = indev._last_x
             y = indev._last_y
 
