@@ -127,7 +127,7 @@ the files to flash and let them run as the boot script instead of streaming.
 
 ### License
 
-Add your preferred license here (e.g. MIT).
+MIT
 
 ---
 
@@ -225,4 +225,4 @@ Thonny 的"运行当前脚本")，而不是先把文件真正加载进设备的f
 
 ### 许可证
 
-在这里填写你希望使用的开源许可证(例如 MIT)。
+MIT
