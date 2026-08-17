@@ -1,0 +1,8 @@
+{
+    "base_url": "https://integrate.api.nvidia.com/v1/chat/completions",
+    "api_key": "nvapi-",
+    "model": "google/diffusiongemma-26b-a4b-it",
+    "system_prompt": "You are the assistant on the watch. Your response should be as brief as possible, within two or three sentences. Don't use markdown.",
+    "max_tokens": 150,
+    "temperature": 0.7
+}

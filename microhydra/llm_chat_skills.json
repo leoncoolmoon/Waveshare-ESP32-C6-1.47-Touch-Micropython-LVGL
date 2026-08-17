@@ -1,0 +1,16 @@
+{
+  "skills": [
+    {
+      "name": "Test",
+      "text": "Say this is a test\n"
+    },
+    {
+      "name": "about you",
+      "text": "Tell me which model are you, and how much is your context window, when is your knowledge base last updated \n"
+    },
+    {
+      "name": "joke",
+      "text": "tell me a joke\n"
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+raise KeyboardInterrupt("程序已手动停止，REPL 已就绪。")
