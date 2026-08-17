@@ -1,8 +1,83 @@
 ![image](https://github.com/user-attachments/assets/9c94f96e-9021-4736-a534-0ab66389a119)
 
-硬件参考资料: https://peter.quantr.hk/2025/07/waveshare-esp32-c6-1-47-touch-micropython-lvgl/
+[English](#english) | [中文说明](#中文说明)
+
+硬件参考资料 / Hardware Reference: https://peter.quantr.hk/2025/07/waveshare-esp32-c6-1-47-touch-micropython-lvgl/
 
 ---
+
+## English
+
+# Software Operation Logic Guide
+
+This project is built for the **Waveshare ESP32-C6 1.47" Touch Display** board, combining MicroHydra and the Bangle Smartband UI. It provides touch gesture keyboard simulation, edge-swipe virtual keyboard input, multi-functional physical button controls, and a crash recovery REPL mode.
+
+---
+
+### 1. Touch Gestures & Keyboard Simulation
+
+In the main canvas area (center of the screen), touch gestures directly simulate standard keyboard inputs:
+
+* **Arrow Keys Simulation (Swiping)**:
+  * **Swipe Up**: Simulates `UP` arrow key
+  * **Swipe Down**: Simulates `DOWN` arrow key
+  * **Swipe Left**: Simulates `RIGHT` arrow key
+  * **Swipe Right**: Simulates `LEFT` arrow key
+* **Enter Key Simulation**:
+  * Tap and hold in the center canvas area for **more than 150ms** and release to simulate the `ENTER` key.
+
+---
+
+### 2. Edge-Swipe Virtual Keyboard Input (`vKey`)
+
+The system includes an edge-swipe virtual keyboard algorithm (`vKey`) for full character input without physical hardware:
+
+1. **Row Selection (Edge Sliding)**:
+   * Press and slide vertically along the **left or right edges** of the screen to select one of the 4 keyboard rows.
+   * The preview bar at the bottom displays the full key layout of the currently selected row in real-time.
+2. **Column Selection & Character Entry (Sliding Inwards)**:
+   * After selecting a row, slide horizontally **inward towards the center canvas** to choose from 14 key columns.
+   * Highlighted indicators at the top and bottom show the currently selected character.
+   * **Type Character**: Release your finger inside the canvas area to output the selected character.
+   * **Cancel**: Slide back to the edge or release outside the canvas to cancel input.
+3. **Keyboard Modes & Modifiers**:
+   * **SHIFT / FN**: Select `SHIFT` or `FN` to toggle capital letters, special symbols, and function keys (F1-F10, ESC, DEL, etc.).
+   * **Modifier Locking (CTL / ALT / OPT)**: Select `CTL`, `ALT`, or `OPT` to lock a modifier key (indicated by a badge badge in the corner). The next character typed will combine with the modifier (e.g., `Ctrl + C`).
+   * **ESC Shortcut**: Tap near the top or bottom extreme edges of the canvas to trigger `ESC`.
+
+---
+
+### 3. Physical Button G0 (GPIO 9) Operation Logic
+
+The physical button **G0** on the side serves different functions depending on the current system state:
+
+* **In Smartband Interface (Bangle UI)**:
+  * Acts as the **Home Button**.
+  * Pressing G0 on any view or plugin page immediately returns to the MicroHydra main launcher (`/launcher/launcher`).
+* **In MicroHydra Launcher**:
+  * Acts as the **Menu Button**.
+  * Pressing G0 in the launcher opens the quick option menu (Home, System Reset, USB / REPL mode, etc.).
+* **During Boot / System Crash Recovery (REPL Mode)**:
+  * Acts as the **Crash Recovery / Debug Interrupt Button**.
+  * If the system crashes or during power-on/reset, **hold down G0**. The boot script (`main.py`) detects G0 as LOW, raises a `KeyboardInterrupt`, and drops directly into the MicroPython **REPL command line** for debugging and recovery.
+
+---
+
+### 4. Smartband UI (Bangle UI) Navigation & Shortcuts
+
+* **View Switching**: Swipe left/right (or use `LEFT` / `RIGHT` keys) to switch between Clock, Notifications, Music, Status, and plugin views (Weather, Alarm, GPS, Chat LLM, etc.).
+* **Page Scrolling**: Swipe up/down (or use `UP` / `DOWN` keys) to scroll lists or long text pages.
+* **Music View**:
+  * `ENTER` (Hold screen): Play / Pause
+  * `UP` / `DOWN` (or `a` / `b` keys): Previous / Next track
+  * `VOL+` / `VOL-`: Volume control
+* **Status View**:
+  * `UP` / `DOWN`: Adjust screen backlight brightness
+  * `ENTER`: Toggle display color inversion
+
+---
+
+## 中文说明
 
 # 软件操作逻辑指南
 
@@ -10,7 +85,7 @@
 
 ---
 
-## 1. 触摸手势与键盘模拟
+### 1. 触摸手势与键盘模拟
 
 在设备屏幕中央的主画布区域，可通过手势直接模拟标准键盘按键输入：
 
@@ -24,7 +99,7 @@
 
 ---
 
-## 2. 边缘滑动虚拟全键盘输入
+### 2. 边缘滑动虚拟全键盘输入
 
 设备支持无需物理全键盘即可完成全字符输入的边缘触摸键盘算法（`vKey`）：
 
@@ -43,7 +118,7 @@
 
 ---
 
-## 3. 物理按键 G0 (GPIO 9) 操作逻辑
+### 3. 物理按键 G0 (GPIO 9) 操作逻辑
 
 设备侧边的物理按键 **G0** 在不同系统状态下扮演不同的核心功能：
 
@@ -59,7 +134,7 @@
 
 ---
 
-## 4. 手环界面 (Bangle UI) 交互与快捷控制
+### 4. 手环界面 (Bangle UI) 交互与快捷控制
 
 * **视图切换**：左右划动屏幕（或模拟 `LEFT` / `RIGHT` 按键）可在时钟 (Clock)、通知 (Notifications)、音乐 (Music)、状态设置 (Status) 及各拓展插件（天气、闹钟、GPS、AI 对话等）之间平滑切换。
 * **内容滚动**：在通知列表、设置菜单或插件页面中上下划动屏幕（或模拟 `UP` / `DOWN` 按键）进行页面滚动。
