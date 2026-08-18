@@ -94,6 +94,10 @@ class BLENotifyBridge:
                  on_time_sync=None, 
                  on_unknown=None,
                  ble=None):
+        # _callbacks_ready/_pending_events 必须在 set_callbacks() 第一次
+        # 被调用之前就先建好 -- 见 set_callbacks() 里的说明。
+        self._callbacks_ready = False
+        self._pending_events = []
         self.set_callbacks(
             on_connect=on_connect, on_disconnect=on_disconnect,
             on_raw_data=on_raw_data,
@@ -126,9 +130,19 @@ class BLENotifyBridge:
                        on_time_sync=None, on_unknown=None):
         # 这个类是"模块一 import 就构造好、马上开始广播"的，但那时候
         # screen 等其它状态还没建出来，回调函数没法一起传进来 --
-        # __init__ 里先用 None 占位，main_loop() 里 screen/回调都建好了
-        # 之后，再调这个方法把它们补上去；GATT 服务注册和广播早就已经
-        # 在跑了，不受这个影响。
+        # __init__ 里先用 None 占位调一次这个方法，main_loop() 里
+        # screen/回调都建好了之后，再真正调一次这个方法把它们补上去；
+        # GATT 服务注册和广播早就已经在跑了，不受这个影响。
+        #
+        # 但这中间有个空档：BLE 广播/连接/收发从 import 时就已经在跑，
+        # 如果手机（尤其是已经配对过、重连很快的情况）在这个空档期内
+        # 就连上、甚至发过来 setTime(...) 握手，这些事件会在真正的回调
+        # 还没接上之前就已经发生 -- 之前的写法是直接 `if self._on_xxx
+        # is not None: ...`，回调还没接上时这些事件会被直接丢掉，什么
+        # 都不会发生，导致"连上了但状态栏还显示断开"、"偶尔漏掉
+        # setTime"这类问题。现在改成：回调真正接上之前发生的事件全部
+        # 先缓存到 _pending_events 里，等回调真的接上了（下面判断
+        # any_provided）再按顺序补放一遍，一个都不丢。
         self._on_connect = on_connect
         self._on_disconnect = on_disconnect
         self._on_raw_data = on_raw_data
@@ -140,6 +154,40 @@ class BLENotifyBridge:
         self._on_musicstate = on_musicstate
         self._on_time_sync = on_time_sync
         self._on_unknown = on_unknown
+
+        any_provided = any((
+            on_connect, on_disconnect, on_raw_data, on_notify, on_notify_bitmap,
+            on_notify_dismiss, on_call, on_musicinfo, on_musicstate, on_time_sync,
+            on_unknown,
+        ))
+        if any_provided and not self._callbacks_ready:
+            self._callbacks_ready = True
+            self._flush_pending_events()
+
+    def _emit(self, attr_name, *args):
+        # 统一的事件派发入口。回调还没真正接上（_callbacks_ready 为
+        # False）的话，不丢事件，先攒到 _pending_events 里，等
+        # set_callbacks() 真正接上回调时会按顺序补放一遍。
+        if not self._callbacks_ready:
+            if len(self._pending_events) < 50:
+                self._pending_events.append((attr_name, args))
+            else:
+                print(f"[BLE] pending event queue full, dropping {attr_name} event")
+            return
+        cb = getattr(self, attr_name, None)
+        if cb is not None:
+            cb(*args)
+
+    def _flush_pending_events(self):
+        pending = self._pending_events
+        self._pending_events = []
+        for attr_name, args in pending:
+            cb = getattr(self, attr_name, None)
+            if cb is not None:
+                try:
+                    cb(*args)
+                except Exception as e:
+                    print(f"[BLE] error replaying queued {attr_name} event:", e)
 
     # ---- BLE plumbing -------------------------------------------------
 
@@ -169,17 +217,15 @@ class BLENotifyBridge:
                     )
                 except Exception as e:
                     print("[BLE] connection param update request failed:", e)
-            if self._on_connect is not None:
-                self._on_connect()
-                
+            self._emit("_on_connect")
+
         elif event == _IRQ_CENTRAL_DISCONNECT:
             conn_handle, _, _ = data
             self._connections.discard(conn_handle)
             self._mtu.pop(conn_handle, None)
             self._rx_buffers.pop(conn_handle, None)
             print("[BLE] central disconnected, handle:", conn_handle)
-            if self._on_disconnect is not None:
-                self._on_disconnect()
+            self._emit("_on_disconnect")
             self._advertise()
         elif event == _IRQ_MTU_EXCHANGED:
             conn_handle, mtu = data
@@ -199,8 +245,7 @@ class BLENotifyBridge:
             conn_handle, value_handle = data
             if value_handle == self._rx_handle:
                 chunk = self._ble.gatts_read(self._rx_handle)
-                if self._on_raw_data is not None:
-                    self._on_raw_data(chunk)
+                self._emit("_on_raw_data", chunk)
                 self._feed_rx(conn_handle, chunk)
 
     def _feed_rx(self, conn_handle, chunk):
@@ -424,8 +469,7 @@ class BLENotifyBridge:
             print("[BLE] time sync: no setTimeZone(...) in this line, reusing tz_offset =", tz_offsetL)
         epoch = float(time_match.group(1))# - (tz_offsetL * 3600)
         print(f"[BLE] time sync: epoch={epoch}, tz_offset={tz_offsetL}h")
-        if self._on_time_sync is not None:
-            self._on_time_sync(epoch, tz_offsetL)
+        self._emit("_on_time_sync", epoch, tz_offsetL)
 
     @staticmethod
     def _parse_gb_object(raw_text):
@@ -487,42 +531,36 @@ class BLENotifyBridge:
                 has_bitmap = isinstance(title_field, dict) or isinstance(body_field, dict)
 
                 if has_bitmap:
-                    if self._on_notify_bitmap is not None:
-                        self._on_notify_bitmap(data.get("src", "unknown"), title_field, body_field, notif_id)
-                elif self._on_notify is not None:
-                    self._on_notify(data.get("src", "unknown"), title_field, body_field, notif_id)
+                    self._emit("_on_notify_bitmap", data.get("src", "unknown"), title_field, body_field, notif_id)
+                else:
+                    self._emit("_on_notify", data.get("src", "unknown"), title_field, body_field, notif_id)
 
             elif t == "notify-":
-                if self._on_notify_dismiss is not None:
-                    self._on_notify_dismiss(data.get("id"))
+                self._emit("_on_notify_dismiss", data.get("id"))
 
             elif t == "call":
-                if self._on_call is not None:
-                    self._on_call(data.get("cmd"), data.get("name", ""), data.get("number", ""))
+                self._emit("_on_call", data.get("cmd"), data.get("name", ""), data.get("number", ""))
 
             elif t == "musicinfo":
-                if self._on_musicinfo is not None:
-                    self._on_musicinfo(data)
+                self._emit("_on_musicinfo", data)
 
             elif t == "musicstate":
-                if self._on_musicstate is not None:
-                    self._on_musicstate(data)
+                self._emit("_on_musicstate", data)
 
             else:
                 # weather / alarm / act / actfetch / listRecs / fetchRec /
                 # calendar / calendar- / gps / gps_power / is_gps_active /
                 # nav / http / find / vibrate / 以及任何未来手机端新加的
                 # 类型，全部走这里，交给 main.py -> plugin_manager 分发。
-                if self._on_unknown is not None:
-                    self._on_unknown(t, data)
+                self._emit("_on_unknown", t, data)
 
         except Exception as e:
-            # 上面每个分支正常情况下已经用 `is not None` 挡住了"回调还
-            # 没接上"这种情况，不会走到这里；这里兜的是回调本身接上了、
-            # 但内部执行出错的情况（比如某个插件/回调自己有 bug）--
-            # 与其让这条消息就这么悄无声息地丢掉，不如尽量把它降级成
-            # 一条通知显示出来，好歹用户能看到点什么、也方便排查是哪条
-            # 消息触发的。
+            # _emit() 在回调还没接上（_callbacks_ready 为 False）的时候
+            # 只会把事件存进 _pending_events，不会抛异常，所以能走到这里
+            # 通常说明回调已经接上了，只是回调本身内部执行出错了（比如
+            # 某个插件/回调自己有 bug）-- 与其让这条消息就这么悄无声息地
+            # 丢掉，不如尽量把它降级成一条通知显示出来，好歹用户能看到
+            # 点什么、也方便排查是哪条消息触发的。
             print(f"[BLE] dispatch error, falling back to notification: {e}")
             if self._on_notify is not None:
                 title = (
