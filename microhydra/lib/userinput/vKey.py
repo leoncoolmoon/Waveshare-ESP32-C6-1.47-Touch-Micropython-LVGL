@@ -83,7 +83,8 @@ _CHARMAP_KEYS = ('FN', 'SHIFT')
 _MOD_KEYS = ('CTL', 'ALT', 'OPT')
 _LOCK_BADGE_CHAR = {'FN': 'F', 'SHIFT': 'S', 'CTL': 'C', 'ALT': 'A', 'OPT': 'O'}
 
-_SWIPE_TO_KEY = {'RIGHT': 'LEFT', 'LEFT': 'RIGHT', 'UP': 'UP', 'DOWN': 'DOWN'}
+#_SWIPE_TO_KEY = {'RIGHT': 'LEFT', 'LEFT': 'RIGHT', 'UP': 'UP', 'DOWN': 'DOWN'}
+_SWIPE_TO_KEY = {'RIGHT': 'RIGHT', 'LEFT': 'LEFT', 'UP': 'UP', 'DOWN': 'DOWN'}
 
 _ST_IDLE = 0
 _ST_ARMED = 1
